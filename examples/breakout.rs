@@ -1,16 +1,43 @@
 use std::time::Instant;
 
 use rand::{
-    distributions::{Distribution, Standard},
+    distributions::{
+        Distribution,
+        Standard,
+    },
     prelude::*,
 };
 
-use glutin::event::{DeviceEvent, ElementState, Event, KeyboardInput, MouseButton, VirtualKeyCode, WindowEvent};
-use glutin::event_loop::{ControlFlow, EventLoop};
-use glutin::window::{Window, WindowBuilder};
+use glutin::event::{
+    DeviceEvent,
+    ElementState,
+    Event,
+    KeyboardInput,
+    MouseButton,
+    VirtualKeyCode,
+    WindowEvent,
+};
+use glutin::event_loop::{
+    ControlFlow,
+    EventLoop,
+};
+use glutin::window::{
+    Window,
+    WindowBuilder,
+};
 use glutin::ContextBuilder;
 
-use femtovg::{renderer::OpenGl, Align, Baseline, Color, FontId, ImageFlags, ImageId, Paint, Path};
+use femtovg::{
+    renderer::OpenGl,
+    Align,
+    Baseline,
+    Color,
+    FontId,
+    ImageFlags,
+    ImageId,
+    Paint,
+    Path,
+};
 
 type Canvas = femtovg::Canvas<OpenGl>;
 type Point = euclid::default::Point2D<f32>;
@@ -394,8 +421,8 @@ impl Game {
 
                 let mut rng = thread_rng();
 
-                let x: f32 = rng.gen_range(150.0, 250.0);
-                let y: f32 = rng.gen_range(-350.0, -250.0);
+                let x: f32 = rng.gen_range(150.0..250.0);
+                let y: f32 = rng.gen_range(-350.0..-250.0);
 
                 match powerup.ty {
                     PowerupType::Multiply => {
@@ -741,7 +768,7 @@ enum PowerupType {
 
 impl Distribution<PowerupType> for Standard {
     fn sample<R: Rng + ?Sized>(&self, rng: &mut R) -> PowerupType {
-        match rng.gen_range(0, 7) {
+        match rng.gen_range(0..7) {
             0 => PowerupType::Enlarge,
             1 => PowerupType::Shrink,
             3 => PowerupType::Slow,

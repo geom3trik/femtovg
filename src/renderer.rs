@@ -3,7 +3,17 @@
 use imgref::ImgVec;
 use rgb::RGBA8;
 
-use crate::{Color, CompositeOperationState, ErrorKind, FillRule, ImageId, ImageInfo, ImageSource, ImageStore};
+use crate::{
+    Color,
+    CompositeOperationState,
+    ErrorKind,
+    FillRule,
+    ImageFilter,
+    ImageId,
+    ImageInfo,
+    ImageSource,
+    ImageStore,
+};
 
 mod opengl;
 pub use opengl::OpenGl;
@@ -47,6 +57,10 @@ pub enum CommandType {
     Triangles {
         params: Params,
     },
+    RenderFilteredImage {
+        target_image: ImageId,
+        filter: ImageFilter,
+    },
 }
 
 pub struct Command {
@@ -85,12 +99,12 @@ pub trait Renderer {
 
     fn set_size(&mut self, width: u32, height: u32, dpi: f32);
 
-    fn render(&mut self, images: &ImageStore<Self::Image>, verts: &[Vertex], commands: &[Command]);
+    fn render(&mut self, images: &mut ImageStore<Self::Image>, verts: &[Vertex], commands: Vec<Command>);
 
     fn alloc_image(&mut self, info: ImageInfo) -> Result<Self::Image, ErrorKind>;
     fn update_image(&mut self, image: &mut Self::Image, data: ImageSource, x: usize, y: usize)
         -> Result<(), ErrorKind>;
-    fn delete_image(&mut self, image: Self::Image);
+    fn delete_image(&mut self, image: Self::Image, image_id: ImageId);
 
     fn screenshot(&mut self) -> Result<ImgVec<RGBA8>, ErrorKind>;
 }
@@ -120,7 +134,8 @@ pub enum ShaderType {
     FillGradient,
     FillImage,
     Stencil,
-    FillImageGradient
+    FillImageGradient,
+    FilterImage,
 }
 
 impl Default for ShaderType {
@@ -135,7 +150,8 @@ impl ShaderType {
             Self::FillGradient => 0.0,
             Self::FillImage => 1.0,
             Self::Stencil => 2.0,
-            Self::FillImageGradient => 3.0
+            Self::FillImageGradient => 3.0,
+            Self::FilterImage => 4.0,
         }
     }
 }

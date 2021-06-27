@@ -1,19 +1,16 @@
-use std::hash::{Hash, Hasher};
-use std::ops::{Index, IndexMut};
+use std::hash::{
+    Hash,
+    Hasher,
+};
+use std::ops::{
+    Index,
+    IndexMut,
+};
 
 use fnv::FnvHasher;
 
 pub fn quantize(a: f32, d: f32) -> f32 {
     (a / d + 0.5).trunc() * d
-}
-
-pub fn triarea2(ax: f32, ay: f32, bx: f32, by: f32, cx: f32, cy: f32) -> f32 {
-    let abx = bx - ax;
-    let aby = by - ay;
-    let acx = cx - ax;
-    let acy = cy - ay;
-
-    acx * aby - abx * acy
 }
 
 pub fn pt_equals(x1: f32, y1: f32, x2: f32, y2: f32, tol: f32) -> bool {
