@@ -582,8 +582,6 @@ pub(crate) struct Quad {
     pub t1: f32,
 }
 
-const MULTIPLIER: f32 = 2.0;
-
 pub(crate) fn render_atlas<T: Renderer>(
     canvas: &mut Canvas<T>,
     text_layout: &TextMetrics,
@@ -628,8 +626,8 @@ pub(crate) fn render_atlas<T: Renderer>(
 
             q.x0 = glyph.x.trunc() - half_line_width - GLYPH_PADDING as f32;
             q.y0 = glyph.y - half_line_width - GLYPH_PADDING as f32;
-            q.x1 = q.x0 + rendered.width as f32 / MULTIPLIER;
-            q.y1 = q.y0 + rendered.height as f32 / MULTIPLIER;
+            q.x1 = q.x0 + rendered.width as f32;
+            q.y1 = q.y0 + rendered.height as f32;
 
             q.s0 = rendered.atlas_x as f32 * itw;
             q.t0 = rendered.atlas_y as f32 * ith;
@@ -659,11 +657,8 @@ fn render_glyph<T: Renderer>(
         0.0
     };
 
-    let mut width = glyph.width.ceil() as u32 + line_width.ceil() as u32 + padding * 2;
-    let mut height = glyph.height.ceil() as u32 + line_width.ceil() as u32 + padding * 2;
-
-    width *= MULTIPLIER as u32;
-    height *= MULTIPLIER as u32;
+    let width = glyph.width.ceil() as u32 + line_width.ceil() as u32 + padding * 2;
+    let height = glyph.height.ceil() as u32 + line_width.ceil() as u32 + padding * 2;
 
     let (dst_index, dst_image_id, (dst_x, dst_y)) = find_texture_or_alloc(
         canvas,
@@ -739,10 +734,9 @@ fn render_glyph<T: Renderer>(
 
     for point in &points {
         canvas.save();
-        canvas.translate(0.0, -(glyph.bearing_y));
         canvas.translate(point.0, point.1);
 
-        canvas.scale(scale * MULTIPLIER, scale * MULTIPLIER);
+        canvas.scale(scale, scale);
 
         if mode == RenderMode::Stroke {
             canvas.stroke_path(&mut path, mask_paint);
