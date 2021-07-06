@@ -20,6 +20,8 @@ use generational_arena::{
 };
 use lru::LruCache;
 
+use textwrap::core::Fragment;
+use textwrap::word_separators::WordSeparator;
 use unicode_bidi::BidiInfo;
 use unicode_segmentation::UnicodeSegmentation;
 
@@ -167,7 +169,21 @@ pub struct ShapedGlyph {
 #[derive(Clone, Debug, Default)]
 struct ShapedWord {
     glyphs: Vec<ShapedGlyph>,
-    width: f32,
+    pub width: f32,
+}
+
+impl textwrap::core::Fragment for ShapedWord {
+    fn width(&self) -> usize {
+        self.glyphs.len()
+    }
+
+    fn whitespace_width(&self) -> usize {
+        0
+    }
+
+    fn penalty_width(&self) -> usize {
+        0
+    }
 }
 
 #[derive(Copy, Clone, Hash, Eq, PartialEq, Ord, PartialOrd)]
@@ -400,24 +416,60 @@ impl TextContextImpl {
     ) -> Result<Vec<Range<usize>>, ErrorKind> {
         let text = text.as_ref();
 
-        let mut res = Vec::new();
+        //let mut res = Vec::new();
+        //let mut start = 0;
+
+        // Break text into words
+        // Shape the words
+        // Wrap the words
+        // Return a vec of ranges
+
+        let words = textwrap::word_separators::UnicodeBreakProperties.find_words(text).collect::<Vec<_>>();
+
+        //println!("Words: {:?}", words.iter().map(|w| w.word ).collect::<Vec<_>>());
+        // let words = words.iter().flat_map(|word|{
+        //     shape_word(word.word, rustybuzz::Direction::LeftToRight, self, &paint)
+        // }).collect::<Vec<_>>();
+
+
+        // let words = text.split_word_bounds()
+        //     .flat_map(|word|{
+        //         shape_word(word, rustybuzz::Direction::LeftToRight, self, &paint)
+        //     }).collect::<Vec<_>>();
+
+        //let test = textwrap::wrap_algorithms::wrap_first_fit(&words, &vec![(max_width/10.0) as usize]);
+        let test = textwrap::wrap_algorithms::wrap_optimal_fit(&words, &vec![(max_width/12.0) as usize]);
+
+
+        let mut ranges = Vec::new();
         let mut start = 0;
-
-        while start < text.len() {
-            if let Ok(index) = self.break_text(max_width, &text[start..], paint) {
-                if index == 0 {
-                    break;
-                }
-
-                let index = start + index;
-                res.push(start..index);
-                start += &text[start..index].len();
-            } else {
-                break;
-            }
+        for line in test {
+            //println!("Words: {:?}", line);
+            //let num = line.iter().fold(0usize, |a, f| a + f.glyphs.len());
+            let num = line.iter().fold(0usize, |a, f| a + f.width() + f.whitespace_width());
+            //println!("{}",num);
+            ranges.push(start..start+num);
+            start += num;
         }
 
-        Ok(res)
+        //println!("Ranges: {:?}", ranges);
+
+        // while start < text.len() {
+        //     if let Ok(index) = self.break_text(max_width, &text[start..], paint) {
+        //         if index == 0 {
+        //             break;
+        //         }
+
+        //         let index = start + index;
+        //         res.push(start..index);
+        //         start += &text[start..index].len();
+        //     } else {
+        //         break;
+        //     }
+        // }
+
+        // Ok(res)
+        Ok(ranges)
     }
 
     pub fn measure_font(&mut self, paint: Paint) -> Result<FontMetrics, ErrorKind> {
@@ -519,6 +571,8 @@ fn shape_run(
         for run in runs.iter() {
             let sub_text = &text[run.clone()];
 
+            //println!("Subtext: {}", sub_text);
+
             if sub_text.is_empty() {
                 continue;
             }
@@ -532,8 +586,27 @@ fn shape_run(
             let mut words = Vec::new();
             let mut word_break_reached = false;
             let mut byte_index = run.start;
+            let mut other_words = Vec::new();
+            // let mut words = sub_text.split_word_bounds().flat_map(|word| {
+            //     let id = ShapingId::new(paint, word, max_width);
+
+            //     if !context.shaped_words_cache.contains(&id) {
+            //         let word = shape_word(word, hb_direction, context, paint);
+            //         context.shaped_words_cache.put(id, word);
+            //     }
+
+            //     context.shaped_words_cache.get(&id).and_then(|r| r.as_ref().ok().cloned().and_then(|mut f| {
+            //         for glyph in &mut f.glyphs {
+            //             glyph.byte_index += byte_index;
+            //             debug_assert!(text.get(glyph.byte_index..).is_some());
+            //         }
+            //         Some(f)
+            //     }))
+
+            // }).collect::<Vec<_>>();
 
             for word in sub_text.split_word_bounds() {
+                //println!("Word: {}", word);
                 let id = ShapingId::new(paint, word, max_width);
 
                 if !context.shaped_words_cache.contains(&id) {
@@ -541,44 +614,54 @@ fn shape_run(
                     context.shaped_words_cache.put(id, word);
                 }
 
-                if let Some(Ok(word)) = context.shaped_words_cache.get(&id) {
-                    let mut word = word.clone();
+                if let Some(Ok(shaped_word)) = context.shaped_words_cache.get(&id) {
+                    let mut shaped_word = shaped_word.clone();
 
                     if let Some(max_width) = max_width {
-                        if result.width + word.width >= max_width {
+                        if result.width + shaped_word.width >= max_width {
                             word_break_reached = true;
                             break;
                         }
                     }
 
-                    result.width += word.width;
+                    result.width += shaped_word.width;
 
-                    for glyph in &mut word.glyphs {
+                    for glyph in &mut shaped_word.glyphs {
                         glyph.byte_index += byte_index;
                         debug_assert!(text.get(glyph.byte_index..).is_some());
                     }
 
-                    words.push(word);
+                    words.push(shaped_word);
+                    other_words.push(word.clone());
                 }
 
                 byte_index += word.len();
             }
 
+            //let w = textwrap::word_separators::AsciiSpace.find_words(&sub_text).collect::<Vec<_>>();
+            //let line_lengths = [max_width.unwrap() as usize];
+            //let test = textwrap::wrap_algorithms::wrap_first_fit(&w, &line_lengths);
+            
+
             if levels[run.start].is_rtl() {
                 words.reverse();
             }
-
+            
             for word in words {
                 result.glyphs.extend(word.glyphs.clone());
             }
 
             result.final_byte_index = byte_index;
 
+            //println!("Words: {:?}", other_words);
+
             if word_break_reached {
                 break;
             }
         }
     }
+
+    //println!("Return");
 
     Ok(result)
 }
